@@ -1,3 +1,29 @@
+class UniversityImage {
+  final String url;
+  final String altText;
+  final String description;
+  final String photographer;
+  final String photographerUrl;
+
+  UniversityImage({
+    required this.url,
+    required this.altText,
+    required this.description,
+    required this.photographer,
+    required this.photographerUrl,
+  });
+
+  factory UniversityImage.fromJson(Map<String, dynamic> json) {
+    return UniversityImage(
+      url: json['url'],
+      altText: json['alt_text'],
+      description: json['description'],
+      photographer: json['photographer'],
+      photographerUrl: json['photographer_url'],
+    );
+  }
+}
+
 class University {
   final int id;
   final String name;
@@ -7,6 +33,8 @@ class University {
   final double latitude;
   final double longitude;
   final DegreeOfferings? degrees;
+  final String? imageUrl;
+  final String? imageAltText;
 
   University({
     required this.id,
@@ -17,6 +45,8 @@ class University {
     required this.latitude,
     required this.longitude,
     this.degrees,
+    this.imageUrl,
+    this.imageAltText,
   });
 
   factory University.fromJson(Map<String, dynamic> json) {
@@ -29,6 +59,8 @@ class University {
       latitude: json['latitude'].toDouble(),
       longitude: json['longitude'].toDouble(),
       degrees: json['degrees'] != null ? DegreeOfferings.fromJson(json['degrees']) : null,
+      imageUrl: json['image_url'],
+      imageAltText: json['alt_text'],
     );
   }
 }
