@@ -40,6 +40,7 @@ dependencies:
   provider: ^6.0.5
   url_launcher: ^6.1.14
   flutter_typeahead: ^4.8.0
+  card_swiper: ^3.0.1
 
 dev_dependencies:
   flutter_test:

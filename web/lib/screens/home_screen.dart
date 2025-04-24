@@ -13,27 +13,34 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
-  final TextEditingController _searchController = TextEditingController();
+class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMixin {
   List<University> _universities = [];
+  Map<int, String> _universityImages = {}; // Cache for university images
   bool _isLoading = false;
   String? _error;
-  String _selectedState = '';
-  bool _filterBachelors = false;
-  bool _filterMasters = false;
-  bool _filterDoctorate = false;
-  Timer? _debounce;
+  int _currentIndex = 0;
+  final List<University> _likedUniversities = [];
+  late AnimationController _animationController;
+  late Animation<double> _animation;
+  double _dragDistance = 0.0;
+  bool _isDragging = false;
+  bool _isLiked = false;
+  bool _isDisliked = false;
 
   @override
   void initState() {
     super.initState();
     _loadUniversities();
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 300),
+    );
+    _animation = Tween<double>(begin: 0, end: 1).animate(_animationController);
   }
 
   @override
   void dispose() {
-    _debounce?.cancel();
-    _searchController.dispose();
+    _animationController.dispose();
     super.dispose();
   }
 
@@ -65,44 +72,74 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  void _onSearchChanged(String query) {
-    if (_debounce?.isActive ?? false) _debounce!.cancel();
-    _debounce = Timer(const Duration(milliseconds: 500), () {
-      _searchUniversities(query);
-    });
-  }
-
-  Future<void> _searchUniversities(String query) async {
-    if (query.isEmpty) {
-      _loadUniversities();
-      return;
-    }
-
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
-
+  Future<void> _loadUniversityImage(int universityId) async {
+    if (_universityImages.containsKey(universityId)) return;
+    
     try {
       final service = Provider.of<UniversityService>(context, listen: false);
-      developer.log('Searching for: $query');
-      final universities = await service.searchUniversities(query);
-      developer.log('Search results: ${universities.length}');
+      final imageData = await service.getUniversityImage(universityId);
       
       if (mounted) {
         setState(() {
-          _universities = universities;
-          _isLoading = false;
+          _universityImages[universityId] = imageData['image_url'];
         });
       }
     } catch (e) {
-      developer.log('Error searching universities: $e');
-      if (mounted) {
-        setState(() {
-          _error = e.toString();
-          _isLoading = false;
-        });
+      developer.log('Error loading university image: $e');
+    }
+  }
+
+  void _onDragStart(DragStartDetails details) {
+    setState(() {
+      _isDragging = true;
+    });
+  }
+
+  void _onDragUpdate(DragUpdateDetails details) {
+    setState(() {
+      _dragDistance += details.delta.dx;
+      _isLiked = _dragDistance > 0;
+      _isDisliked = _dragDistance < 0;
+    });
+  }
+
+  void _onDragEnd(DragEndDetails details) {
+    setState(() {
+      _isDragging = false;
+      if (_dragDistance.abs() > 100) {
+        if (_dragDistance > 0) {
+          _onLike();
+        } else {
+          _onDislike();
+        }
+      } else {
+        _dragDistance = 0;
+        _isLiked = false;
+        _isDisliked = false;
       }
+    });
+  }
+
+  void _onLike() {
+    if (_currentIndex < _universities.length) {
+      setState(() {
+        _likedUniversities.add(_universities[_currentIndex]);
+        _currentIndex++;
+        _dragDistance = 0;
+        _isLiked = false;
+        _isDisliked = false;
+      });
+    }
+  }
+
+  void _onDislike() {
+    if (_currentIndex < _universities.length) {
+      setState(() {
+        _currentIndex++;
+        _dragDistance = 0;
+        _isLiked = false;
+        _isDisliked = false;
+      });
     }
   }
 
@@ -110,158 +147,273 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('University Search'),
+        title: const Text('University Match'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.favorite),
+            onPressed: () {
+              // TODO: Show liked universities
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.person),
+            onPressed: () {
+              // TODO: Show student profile/preferences
+            },
+          ),
+        ],
       ),
-      body: Column(
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _error != null
+              ? Center(child: Text('Error: $_error'))
+              : _universities.isEmpty || _currentIndex >= _universities.length
+                  ? const Center(child: Text('No more universities to show'))
+                  : SizedBox.expand(
+                      child: Stack(
+                        children: [
+                          // University Card
+                          Center(
+                            child: AnimatedPositioned(
+                              duration: const Duration(milliseconds: 300),
+                              curve: Curves.easeOut,
+                              left: _dragDistance,
+                              child: GestureDetector(
+                                onHorizontalDragStart: _onDragStart,
+                                onHorizontalDragUpdate: _onDragUpdate,
+                                onHorizontalDragEnd: _onDragEnd,
+                                child: SizedBox(
+                                  width: MediaQuery.of(context).size.width * 0.9,
+                                  height: MediaQuery.of(context).size.height * 0.75,
+                                  child: _buildUniversityCard(_universities[_currentIndex]),
+                                ),
+                              ),
+                            ),
+                          ),
+                          // Like Overlay
+                          if (_isDragging && _isLiked)
+                            Positioned.fill(
+                              child: Align(
+                                alignment: Alignment.center,
+                                child: Transform.rotate(
+                                  angle: -0.1,
+                                  child: Container(
+                                    padding: const EdgeInsets.all(16),
+                                    decoration: BoxDecoration(
+                                      border: Border.all(color: Colors.green, width: 4),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: const Text(
+                                      'LIKE',
+                                      style: TextStyle(
+                                        color: Colors.green,
+                                        fontSize: 32,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          // Dislike Overlay
+                          if (_isDragging && _isDisliked)
+                            Positioned.fill(
+                              child: Align(
+                                alignment: Alignment.center,
+                                child: Transform.rotate(
+                                  angle: 0.1,
+                                  child: Container(
+                                    padding: const EdgeInsets.all(16),
+                                    decoration: BoxDecoration(
+                                      border: Border.all(color: Colors.red, width: 4),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: const Text(
+                                      'NOPE',
+                                      style: TextStyle(
+                                        color: Colors.red,
+                                        fontSize: 32,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          // Action Buttons
+                          Positioned(
+                            bottom: 20,
+                            left: 0,
+                            right: 0,
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                              children: [
+                                _buildActionButton(
+                                  Icons.close,
+                                  Colors.red,
+                                  _onDislike,
+                                ),
+                                _buildActionButton(
+                                  Icons.favorite,
+                                  Colors.green,
+                                  _onLike,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+    );
+  }
+
+  Widget _buildUniversityCard(University university) {
+    // Load image when card is built
+    _loadUniversityImage(university.id);
+    
+    return Card(
+      margin: const EdgeInsets.all(16.0),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(15.0),
+      ),
+      elevation: 8,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
+          Expanded(
+            child: ClipRRect(
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(15.0)),
+              child: Container(
+                color: Colors.grey[200],
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    // University image or fallback
+                    if (_universityImages.containsKey(university.id) && 
+                        _universityImages[university.id]!.isNotEmpty)
+                      Image.network(
+                        _universityImages[university.id]!,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) {
+                          return _buildFallbackImage(university);
+                        },
+                      )
+                    else
+                      _buildFallbackImage(university),
+                    // Location badge
+                    Positioned(
+                      top: 20,
+                      right: 20,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.8),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.location_on, size: 16, color: Colors.grey[600]),
+                            const SizedBox(width: 4),
+                            Text(
+                              university.state,
+                              style: TextStyle(
+                                color: Colors.grey[800],
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
           Padding(
             padding: const EdgeInsets.all(16.0),
-            child: Row(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  child: TextField(
-                    controller: _searchController,
-                    decoration: const InputDecoration(
-                      hintText: 'Search universities...',
-                      prefixIcon: Icon(Icons.search),
-                      border: OutlineInputBorder(),
-                    ),
-                    onChanged: _onSearchChanged,
+                Text(
+                  university.name,
+                  style: const TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
-                const SizedBox(width: 8),
-                IconButton(
-                  icon: const Icon(Icons.filter_list),
-                  onPressed: _showFilterDialog,
+                const SizedBox(height: 8),
+                Text(
+                  '${university.state} - ${university.sector}',
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: Colors.grey[600],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Icon(Icons.location_on, color: Colors.grey[600]),
+                    const SizedBox(width: 4),
+                    Text(university.zip),
+                  ],
                 ),
               ],
             ),
           ),
-          if (_error != null)
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Text(
-                'Error: $_error',
-                style: const TextStyle(color: Colors.red),
-              ),
-            ),
-          Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : _universities.isEmpty
-                    ? const Center(
-                        child: Text('No universities found'),
-                      )
-                    : ListView.builder(
-                        itemCount: _universities.length,
-                        itemBuilder: (context, index) {
-                          final university = _universities[index];
-                          return Card(
-                            margin: const EdgeInsets.symmetric(
-                              horizontal: 16.0,
-                              vertical: 8.0,
-                            ),
-                            child: ListTile(
-                              title: Text(university.name),
-                              subtitle: Text('${university.state} - ${university.sector}'),
-                              onTap: () => _showUniversityDetails(university),
-                            ),
-                          );
-                        },
-                      ),
-          ),
         ],
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _loadUniversities,
-        tooltip: 'Refresh',
-        child: const Icon(Icons.refresh),
       ),
     );
   }
 
-  void _showFilterDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Filter Universities'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
+  Widget _buildFallbackImage(University university) {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Colors.blue.withOpacity(0.1),
+            Colors.purple.withOpacity(0.1),
+          ],
+        ),
+      ),
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            CheckboxListTile(
-              title: const Text('Offers Bachelor\'s'),
-              value: _filterBachelors,
-              onChanged: (value) {
-                setState(() => _filterBachelors = value ?? false);
-                Navigator.pop(context);
-              },
+            Icon(
+              Icons.school,
+              size: 80,
+              color: Colors.blue.withOpacity(0.5),
             ),
-            CheckboxListTile(
-              title: const Text('Offers Master\'s'),
-              value: _filterMasters,
-              onChanged: (value) {
-                setState(() => _filterMasters = value ?? false);
-                Navigator.pop(context);
-              },
-            ),
-            CheckboxListTile(
-              title: const Text('Offers Doctorate'),
-              value: _filterDoctorate,
-              onChanged: (value) {
-                setState(() => _filterDoctorate = value ?? false);
-                Navigator.pop(context);
-              },
+            const SizedBox(height: 16),
+            Text(
+              university.name,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: Colors.blue.withOpacity(0.8),
+              ),
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
-          ),
-        ],
       ),
     );
   }
 
-  void _showUniversityDetails(University university) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(university.name),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('State: ${university.state}'),
-              Text('Sector: ${university.sector}'),
-              Text('ZIP: ${university.zip}'),
-              const SizedBox(height: 16),
-              SizedBox(
-                height: 200,
-                child: GoogleMap(
-                  initialCameraPosition: CameraPosition(
-                    target: LatLng(university.latitude, university.longitude),
-                    zoom: 15,
-                  ),
-                  markers: {
-                    Marker(
-                      markerId: MarkerId(university.id.toString()),
-                      position: LatLng(university.latitude, university.longitude),
-                    ),
-                  },
-                ),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
-          ),
-        ],
+  Widget _buildActionButton(IconData icon, Color color, VoidCallback onPressed) {
+    return Container(
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: color.withOpacity(0.1),
+      ),
+      child: IconButton(
+        icon: Icon(icon, color: color),
+        onPressed: onPressed,
+        iconSize: 32,
       ),
     );
   }
