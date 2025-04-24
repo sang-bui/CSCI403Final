@@ -83,8 +83,39 @@ def read_root():
     return {"message": "Welcome to the Universities API"}
 
 @app.get("/universities/", response_model=List[dict])
-def get_universities(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    universities = db.query(University).offset(skip).limit(limit).all()
+def get_universities(
+    skip: int = 0, 
+    limit: int = 100,
+    states: str = None,  # Comma-separated list of states
+    sector: str = None,
+    offers_bachelors: bool = None,
+    offers_masters: bool = None,
+    offers_doctorate: bool = None,
+    db: Session = Depends(get_db)
+):
+    query = db.query(University)
+    
+    # Apply state filters if provided
+    if states:
+        state_list = [state.strip() for state in states.split(',')]
+        query = query.filter(University.state.in_(state_list))
+    
+    # Apply sector filter if provided
+    if sector:
+        query = query.filter(University.sector == sector)
+    
+    # Apply degree filters if provided
+    if any([offers_bachelors, offers_masters, offers_doctorate]):
+        query = query.join(DegreeOffering)
+        if offers_bachelors is not None:
+            query = query.filter(DegreeOffering.offers_bachelors == offers_bachelors)
+        if offers_masters is not None:
+            query = query.filter(DegreeOffering.offers_masters == offers_masters)
+        if offers_doctorate is not None:
+            query = query.filter(DegreeOffering.offers_doctorate == offers_doctorate)
+    
+    universities = query.offset(skip).limit(limit).all()
+    
     return [{
         "id": u.id,
         "name": u.name,
