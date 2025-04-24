@@ -6,24 +6,57 @@ import '../models/university.dart';
 class UniversityService {
   static const String baseUrl = 'http://localhost:8000';
 
-  Future<List<University>> getUniversities({int skip = 0, int limit = 100}) async {
+  Future<List<University>> getUniversities({
+    int skip = 0,
+    int limit = 100,
+    List<String>? states,
+    String? sector,
+    bool? offersBachelors,
+    bool? offersMasters,
+    bool? offersDoctorate,
+  }) async {
     try {
-      final response = await http.get(Uri.parse('$baseUrl/universities/?skip=$skip&limit=$limit'));
+      final queryParams = {
+        'skip': skip.toString(),
+        'limit': limit.toString(),
+      };
+      
+      if (states != null && states.isNotEmpty) {
+        queryParams['states'] = states.join(',');
+      }
+      if (sector != null) queryParams['sector'] = sector;
+      if (offersBachelors != null) queryParams['offers_bachelors'] = offersBachelors.toString();
+      if (offersMasters != null) queryParams['offers_masters'] = offersMasters.toString();
+      if (offersDoctorate != null) queryParams['offers_doctorate'] = offersDoctorate.toString();
+      
+      final uri = Uri.parse('$baseUrl/universities/').replace(queryParameters: queryParams);
+      final response = await http.get(uri);
       developer.log('API Response: ${response.body}');
       
       if (response.statusCode == 200) {
         final List<dynamic> data = json.decode(response.body);
         developer.log('Parsed data length: ${data.length}');
         
-        final universities = data.map((json) {
+        // Fetch degree information for each university
+        List<University> universities = [];
+        for (var uniData in data) {
           try {
-            return University.fromJson(json);
+            // Get detailed university info including degrees
+            final detailResponse = await http.get(
+              Uri.parse('$baseUrl/universities/${uniData['id']}')
+            );
+            if (detailResponse.statusCode == 200) {
+              final detailData = json.decode(detailResponse.body);
+              universities.add(University.fromJson({
+                ...detailData['university'],
+                'degrees': detailData['degrees']
+              }));
+            }
           } catch (e) {
-            developer.log('Error parsing university: $e');
-            developer.log('Problematic JSON: $json');
-            rethrow;
+            developer.log('Error fetching university details: $e');
+            continue;
           }
-        }).toList();
+        }
         
         developer.log('Parsed universities length: ${universities.length}');
         return universities;
