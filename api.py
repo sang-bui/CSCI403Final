@@ -5,6 +5,7 @@ from sqlalchemy.orm import sessionmaker, Session, relationship
 from typing import List
 import pandas as pd
 import os
+import requests
 from dotenv import load_dotenv
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -164,6 +165,110 @@ def get_university_degrees(university_id: int, db: Session = Depends(get_db)):
         "offers_post_doctorate_certificate": degrees.offers_post_doctorate_certificate,
         "highest_degree": degrees.highest_degree
     }
+
+@app.get("/universities/{university_id}/image")
+def get_university_image(university_id: int, db: Session = Depends(get_db)):
+    """
+    Returns a single university image from Wikipedia, focusing on campus buildings
+    """
+    try:
+        # First get the university name from our database
+        university = db.query(University).filter(University.id == university_id).first()
+        if not university:
+            raise HTTPException(status_code=404, detail="University not found")
+
+        # Search Wikipedia for the university
+        search_url = "https://en.wikipedia.org/w/api.php"
+        
+        # First try to find the main campus image
+        params = {
+            "action": "query",
+            "format": "json",
+            "list": "search",
+            "srsearch": f"{university.name} campus building main",
+            "srlimit": 1
+        }
+        
+        search_response = requests.get(search_url, params=params)
+        search_response.raise_for_status()
+        search_data = search_response.json()
+        
+        if not search_data.get("query", {}).get("search"):
+            # If no campus image found, try a broader search
+            params["srsearch"] = f"{university.name} university building"
+            search_response = requests.get(search_url, params=params)
+            search_response.raise_for_status()
+            search_data = search_response.json()
+            
+            if not search_data.get("query", {}).get("search"):
+                return {"image_url": "", "alt_text": "No image available"}
+        
+        page_title = search_data["query"]["search"][0]["title"]
+        
+        # Get images from the Wikipedia page
+        image_params = {
+            "action": "query",
+            "format": "json",
+            "prop": "images",
+            "titles": page_title,
+            "imlimit": 50  # Get more images to find the best one
+        }
+        
+        image_response = requests.get(search_url, params=image_params)
+        image_response.raise_for_status()
+        image_data = image_response.json()
+        
+        # Get the page ID
+        pages = image_data.get("query", {}).get("pages", {})
+        if not pages:
+            return {"image_url": "", "alt_text": "No image available"}
+            
+        page_id = list(pages.keys())[0]
+        images = pages[page_id].get("images", [])
+        
+        if not images:
+            return {"image_url": "", "alt_text": "No image available"}
+            
+        # Filter images to find the best campus/building photo
+        building_keywords = ['campus', 'building', 'hall', 'library', 'main', 'center', 'university']
+        filtered_images = [
+            img for img in images 
+            if any(keyword in img["title"].lower() for keyword in building_keywords)
+        ]
+        
+        # If no building images found, use the first image
+        target_image = filtered_images[0] if filtered_images else images[0]
+            
+        # Get the image URL
+        image_url_params = {
+            "action": "query",
+            "format": "json",
+            "prop": "imageinfo",
+            "iiprop": "url",
+            "titles": target_image["title"]
+        }
+        
+        url_response = requests.get(search_url, params=image_url_params)
+        url_response.raise_for_status()
+        url_data = url_response.json()
+        
+        url_pages = url_data.get("query", {}).get("pages", {})
+        if not url_pages:
+            return {"image_url": "", "alt_text": "No image available"}
+            
+        url_page_id = list(url_pages.keys())[0]
+        image_url = url_pages[url_page_id]["imageinfo"][0]["url"]
+        
+        return {
+            "image_url": image_url,
+            "alt_text": target_image["title"]
+        }
+    except requests.exceptions.RequestException as e:
+        print(f"Error making request to Wikipedia: {e}")
+        raise HTTPException(status_code=500, detail=f"Error fetching image from Wikipedia: {str(e)}")
+    except Exception as e:
+        print(f"Unexpected error: {e}")
+        raise HTTPException(status_code=500, detail=f"Error processing image: {str(e)}")
 
 if __name__ == "__main__":
     import uvicorn
