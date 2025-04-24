@@ -2,7 +2,7 @@ from fastapi import FastAPI, HTTPException, Depends
 from sqlalchemy import create_engine, Column, Integer, String, Boolean, Float, Text, ForeignKey
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session, relationship
-from typing import List
+from typing import List, Optional
 import pandas as pd
 import os
 import requests
@@ -82,11 +82,16 @@ def get_db():
 def read_root():
     return {"message": "Welcome to the Universities API"}
 
+@app.get("/universities/states")
+async def get_all_states(db: Session = Depends(get_db)):
+    states = db.query(University.state).distinct().order_by(University.state).all()
+    return [state[0] for state in states if state[0] is not None]
+
 @app.get("/universities/", response_model=List[dict])
 def get_universities(
     skip: int = 0, 
     limit: int = 100,
-    states: str = None,  # Comma-separated list of states
+    states: str = None,
     sector: str = None,
     offers_bachelors: bool = None,
     offers_masters: bool = None,

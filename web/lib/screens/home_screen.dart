@@ -16,8 +16,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMixin {
   List<University> _universities = [];
-  List<University> _allUniversities = []; // Store all universities
-  Set<String> _allStates = {}; // Store all available states
+  List<String> _allStates = []; // Changed to List<String>
   Map<int, String> _universityImages = {}; // Cache for university images
   bool _isLoading = false;
   String? _error;
@@ -40,7 +39,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   @override
   void initState() {
     super.initState();
-    _loadInitialUniversities();
+    _loadInitialData();
     _animationController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 300),
@@ -54,7 +53,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     super.dispose();
   }
 
-  Future<void> _loadInitialUniversities() async {
+  Future<void> _loadInitialData() async {
     setState(() {
       _isLoading = true;
       _error = null;
@@ -62,19 +61,22 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 
     try {
       final service = Provider.of<UniversityService>(context, listen: false);
+      
+      // Load all states first
+      final states = await service.getAllStates();
+      
+      // Then load universities
       final universities = await service.getUniversities();
-      developer.log('Loaded universities: ${universities.length}');
       
       if (mounted) {
         setState(() {
-          _allUniversities = universities;
+          _allStates = states;
           _universities = universities;
-          _allStates = universities.map((u) => u.state).toSet();
           _isLoading = false;
         });
       }
     } catch (e) {
-      developer.log('Error loading universities: $e');
+      developer.log('Error loading initial data: $e');
       if (mounted) {
         setState(() {
           _error = e.toString();
@@ -315,9 +317,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   }
 
   List<String> _getUniqueStates() {
-    final states = _allStates.toList();
-    states.sort();
-    return states;
+    return List.from(_allStates)..sort();
   }
 
   List<String> _getUniqueSectors() {

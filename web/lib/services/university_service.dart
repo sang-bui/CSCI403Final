@@ -152,4 +152,26 @@ class UniversityService {
       rethrow;
     }
   }
+
+  Future<List<String>> getAllStates() async {
+    try {
+      final uri = Uri.parse('$baseUrl/universities/states');
+      developer.log('Fetching states from: $uri');
+      final response = await http.get(uri);
+      developer.log('States response status: ${response.statusCode}');
+      developer.log('States response body: ${response.body}');
+      
+      if (response.statusCode == 200) {
+        final List<dynamic> data = json.decode(response.body);
+        // Filter out any null values and convert to strings
+        return data.where((state) => state != null).map((state) => state.toString()).toList()..sort();
+      } else {
+        developer.log('Failed to load states: ${response.statusCode}');
+        throw Exception('Failed to load states: ${response.statusCode}');
+      }
+    } catch (e) {
+      developer.log('Error in getAllStates: $e');
+      rethrow;
+    }
+  }
 } 
