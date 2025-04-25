@@ -6,6 +6,8 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'dart:developer' as developer;
 import 'dart:async';
 import 'university_detail_screen.dart';
+import '../services/swipe_service.dart';
+import 'matches_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -35,6 +37,12 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   bool _offersBachelors = false;
   bool _offersMasters = false;
   bool _offersDoctorate = false;
+  
+  // Add new filter state variables
+  bool _showHbcuOnly = false;
+  bool _showTribalOnly = false;
+  String? _selectedReligiousAffiliation;
+  String? _selectedControl;
 
   @override
   void initState() {
@@ -100,6 +108,11 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         offersBachelors: _offersBachelors ? true : null,
         offersMasters: _offersMasters ? true : null,
         offersDoctorate: _offersDoctorate ? true : null,
+        // Add new filter parameters
+        isHbcu: _showHbcuOnly ? true : null,
+        isTribal: _showTribalOnly ? true : null,
+        religiousAffiliation: _selectedReligiousAffiliation,
+        controlOfInstitution: _selectedControl,
       );
       developer.log('Loaded universities: ${universities.length}');
       
@@ -121,6 +134,24 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     }
   }
 
+  Future<void> _preloadNextImages(int startIndex) async {
+    final service = Provider.of<UniversityService>(context, listen: false);
+    for (int i = 1; i <= 3; i++) {
+      if (startIndex + i < _universities.length) {
+        final nextUniversityId = _universities[startIndex + i].id;
+        if (!_universityImages.containsKey(nextUniversityId)) {
+          service.getUniversityImage(nextUniversityId).then((nextImageData) {
+            if (mounted) {
+              setState(() {
+                _universityImages[nextUniversityId] = nextImageData['image_url'];
+              });
+            }
+          });
+        }
+      }
+    }
+  }
+
   Future<void> _loadUniversityImage(int universityId) async {
     if (_universityImages.containsKey(universityId)) return;
     
@@ -132,6 +163,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         setState(() {
           _universityImages[universityId] = imageData['image_url'];
         });
+        
+        // Pre-load the next 3 universities' images
+        _preloadNextImages(_currentIndex);
       }
     } catch (e) {
       developer.log('Error loading university image: $e');
@@ -171,24 +205,51 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 
   void _onLike() {
     if (_currentIndex < _universities.length) {
+      final university = _universities[_currentIndex];
       setState(() {
-        _likedUniversities.add(_universities[_currentIndex]);
+        _likedUniversities.add(university);
         _currentIndex++;
         _dragDistance = 0;
         _isLiked = false;
         _isDisliked = false;
       });
+
+      // Save swipe to database
+      _saveSwipe(university.id, 'right');
+      
+      // Pre-load next images after swipe
+      _preloadNextImages(_currentIndex);
     }
   }
 
   void _onDislike() {
     if (_currentIndex < _universities.length) {
+      final university = _universities[_currentIndex];
       setState(() {
         _currentIndex++;
         _dragDistance = 0;
         _isLiked = false;
         _isDisliked = false;
       });
+
+      // Save swipe to database
+      _saveSwipe(university.id, 'left');
+      
+      // Pre-load next images after swipe
+      _preloadNextImages(_currentIndex);
+    }
+  }
+
+  Future<void> _saveSwipe(int universityId, String direction) async {
+    try {
+      final service = Provider.of<SwipeService>(context, listen: false);
+      await service.createSwipe(
+        universityId: universityId,
+        swipeDirection: direction,
+      );
+    } catch (e) {
+      developer.log('Error saving swipe: $e');
+      // Don't show error to user to not interrupt the swipe experience
     }
   }
 
@@ -289,6 +350,63 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                       });
                     },
                   ),
+                  const SizedBox(height: 16),
+                  // Institution Type Filters
+                  const Text('Institution Type', style: TextStyle(fontWeight: FontWeight.bold)),
+                  CheckboxListTile(
+                    title: const Text('HBCUs Only'),
+                    value: _showHbcuOnly,
+                    onChanged: (value) {
+                      setDialogState(() {
+                        _showHbcuOnly = value ?? false;
+                      });
+                    },
+                  ),
+                  CheckboxListTile(
+                    title: const Text('Tribal Colleges Only'),
+                    value: _showTribalOnly,
+                    onChanged: (value) {
+                      setDialogState(() {
+                        _showTribalOnly = value ?? false;
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  // Religious Affiliation Filter
+                  DropdownButtonFormField<String>(
+                    value: _selectedReligiousAffiliation,
+                    decoration: const InputDecoration(labelText: 'Religious Affiliation'),
+                    items: [
+                      const DropdownMenuItem(value: null, child: Text('All Affiliations')),
+                      ..._getUniqueReligiousAffiliations().map((affiliation) => DropdownMenuItem(
+                        value: affiliation,
+                        child: Text(affiliation),
+                      )),
+                    ],
+                    onChanged: (value) {
+                      setDialogState(() {
+                        _selectedReligiousAffiliation = value;
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  // Control of Institution Filter
+                  DropdownButtonFormField<String>(
+                    value: _selectedControl,
+                    decoration: const InputDecoration(labelText: 'Control of Institution'),
+                    items: [
+                      const DropdownMenuItem(value: null, child: Text('All Types')),
+                      ..._getUniqueControlTypes().map((control) => DropdownMenuItem(
+                        value: control,
+                        child: Text(control),
+                      )),
+                    ],
+                    onChanged: (value) {
+                      setDialogState(() {
+                        _selectedControl = value;
+                      });
+                    },
+                  ),
                 ],
               ),
             ),
@@ -326,6 +444,26 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     return sectors;
   }
 
+  List<String> _getUniqueReligiousAffiliations() {
+    final affiliations = _universities
+        .map((u) => u.religiousAffiliation)
+        .where((a) => a != null)
+        .map((a) => a!)
+        .toSet()
+        .toList();
+    affiliations.sort();
+    return affiliations;
+  }
+
+  List<String> _getUniqueControlTypes() {
+    final controls = _universities
+        .map((u) => u.controlOfInstitution)
+        .toSet()
+        .toList();
+    controls.sort();
+    return controls;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -335,6 +473,17 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           IconButton(
             icon: const Icon(Icons.filter_list),
             onPressed: _showFilterDialog,
+          ),
+          IconButton(
+            icon: const Icon(Icons.favorite),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const MatchesScreen(),
+                ),
+              );
+            },
           ),
         ],
       ),

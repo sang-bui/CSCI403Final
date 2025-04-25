@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/university_service.dart';
 import '../models/university.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class UniversityDetailScreen extends StatelessWidget {
   final University university;
@@ -13,6 +14,28 @@ class UniversityDetailScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: Text(university.name),
+        actions: [
+          if (university.website != null)
+            IconButton(
+              icon: const Icon(Icons.language),
+              onPressed: () async {
+                final url = university.website!;
+                if (await canLaunch(url)) {
+                  await launch(url);
+                }
+              },
+            ),
+          if (university.phoneNumber != null)
+            IconButton(
+              icon: const Icon(Icons.phone),
+              onPressed: () async {
+                final tel = 'tel:${university.phoneNumber}';
+                if (await canLaunch(tel)) {
+                  await launch(tel);
+                }
+              },
+            ),
+        ],
       ),
       body: SingleChildScrollView(
         child: Column(
@@ -43,6 +66,14 @@ class UniversityDetailScreen extends StatelessWidget {
                 ),
               ),
             ),
+            if (university.description != null)
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Text(
+                  university.description!,
+                  style: const TextStyle(fontSize: 16),
+                ),
+              ),
             Padding(
               padding: const EdgeInsets.all(16.0),
               child: Column(
@@ -58,12 +89,59 @@ class UniversityDetailScreen extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 24),
-                  // Coordinates
+                  // Admissions Statistics
+                  if (university.applicantsTotal != null || 
+                      university.admissionsTotal != null || 
+                      university.enrolledTotal != null)
+                    _buildInfoSection(
+                      'Admissions Statistics',
+                      [
+                        if (university.applicantsTotal != null)
+                          _buildInfoRow('Total Applicants', university.applicantsTotal!.toStringAsFixed(0)),
+                        if (university.admissionsTotal != null)
+                          _buildInfoRow('Total Admitted', university.admissionsTotal!.toStringAsFixed(0)),
+                        if (university.enrolledTotal != null)
+                          _buildInfoRow('Total Enrolled', university.enrolledTotal!.toStringAsFixed(0)),
+                        if (university.admissionsTotal != null && university.applicantsTotal != null)
+                          _buildInfoRow(
+                            'Acceptance Rate',
+                            '${((university.admissionsTotal! / university.applicantsTotal!) * 100).toStringAsFixed(1)}%'
+                          ),
+                      ],
+                    ),
+                  const SizedBox(height: 24),
+                  // Test Scores
+                  if (university.pctSubmitSat != null || university.pctSubmitAct != null)
+                    _buildInfoSection(
+                      'Test Scores',
+                      [
+                        if (university.pctSubmitSat != null)
+                          _buildInfoRow('Submit SAT', '${(university.pctSubmitSat! * 100).toStringAsFixed(1)}%'),
+                        if (university.satMath25 != null && university.satMath75 != null)
+                          _buildInfoRow('SAT Math', '${university.satMath25!.toStringAsFixed(0)} - ${university.satMath75!.toStringAsFixed(0)}'),
+                        if (university.satReading25 != null && university.satReading75 != null)
+                          _buildInfoRow('SAT Reading', '${university.satReading25!.toStringAsFixed(0)} - ${university.satReading75!.toStringAsFixed(0)}'),
+                        if (university.satWriting25 != null && university.satWriting75 != null)
+                          _buildInfoRow('SAT Writing', '${university.satWriting25!.toStringAsFixed(0)} - ${university.satWriting75!.toStringAsFixed(0)}'),
+                        if (university.pctSubmitAct != null)
+                          _buildInfoRow('Submit ACT', '${(university.pctSubmitAct! * 100).toStringAsFixed(1)}%'),
+                        if (university.actComposite25 != null && university.actComposite75 != null)
+                          _buildInfoRow('ACT Composite', '${university.actComposite25!.toStringAsFixed(0)} - ${university.actComposite75!.toStringAsFixed(0)}'),
+                      ],
+                    ),
+                  const SizedBox(height: 24),
+                  // Institution Identity
                   _buildInfoSection(
-                    'Coordinates',
+                    'Institution Identity',
                     [
-                      _buildInfoRow('Latitude', university.latitude.toString()),
-                      _buildInfoRow('Longitude', university.longitude.toString()),
+                      _buildInfoRow('Carnegie Classification', university.carnegieClassification),
+                      _buildInfoRow('Control', university.controlOfInstitution),
+                      if (university.isHbcu)
+                        _buildInfoRow('HBCU', 'Yes'),
+                      if (university.isTribal)
+                        _buildInfoRow('Tribal College', 'Yes'),
+                      if (university.religiousAffiliation != null)
+                        _buildInfoRow('Religious Affiliation', university.religiousAffiliation!),
                     ],
                   ),
                   const SizedBox(height: 24),
