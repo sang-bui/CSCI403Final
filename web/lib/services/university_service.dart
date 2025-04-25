@@ -4,7 +4,9 @@ import 'package:http/http.dart' as http;
 import '../models/university.dart';
 
 class UniversityService {
-  static const String baseUrl = 'http://localhost:8000';
+  final String baseUrl;
+
+  UniversityService({required this.baseUrl});
 
   Future<List<University>> getUniversities({
     int skip = 0,
@@ -14,6 +16,10 @@ class UniversityService {
     bool? offersBachelors,
     bool? offersMasters,
     bool? offersDoctorate,
+    bool? isHbcu,
+    bool? isTribal,
+    String? religiousAffiliation,
+    String? controlOfInstitution,
   }) async {
     try {
       final queryParams = {
@@ -28,6 +34,10 @@ class UniversityService {
       if (offersBachelors != null) queryParams['offers_bachelors'] = offersBachelors.toString();
       if (offersMasters != null) queryParams['offers_masters'] = offersMasters.toString();
       if (offersDoctorate != null) queryParams['offers_doctorate'] = offersDoctorate.toString();
+      if (isHbcu != null) queryParams['is_hbcu'] = isHbcu.toString();
+      if (isTribal != null) queryParams['is_tribal'] = isTribal.toString();
+      if (religiousAffiliation != null) queryParams['religious_affiliation'] = religiousAffiliation;
+      if (controlOfInstitution != null) queryParams['control_of_institution'] = controlOfInstitution;
       
       final uri = Uri.parse('$baseUrl/universities/').replace(queryParameters: queryParams);
       final response = await http.get(uri);
@@ -171,6 +181,24 @@ class UniversityService {
       }
     } catch (e) {
       developer.log('Error in getAllStates: $e');
+      rethrow;
+    }
+  }
+
+  Future<University> getUniversity(int id) async {
+    try {
+      final response = await http.get(Uri.parse('$baseUrl/universities/$id'));
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        return University.fromJson({
+          ...data['university'],
+          'degrees': data['degrees']
+        });
+      } else {
+        throw Exception('Failed to load university: ${response.statusCode}');
+      }
+    } catch (e) {
+      developer.log('Error in getUniversity: $e');
       rethrow;
     }
   }
