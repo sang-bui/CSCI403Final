@@ -35,6 +35,27 @@ class University {
   final DegreeOfferings? degrees;
   final String? imageUrl;
   final String? imageAltText;
+  final bool isHbcu;
+  final bool isTribal;
+  final String? religiousAffiliation;
+  final String carnegieClassification;
+  final String controlOfInstitution;
+  final double? applicantsTotal;
+  final double? admissionsTotal;
+  final double? enrolledTotal;
+  final double? pctSubmitSat;
+  final double? pctSubmitAct;
+  final double? satReading25;
+  final double? satReading75;
+  final double? satMath25;
+  final double? satMath75;
+  final double? satWriting25;
+  final double? satWriting75;
+  final double? actComposite25;
+  final double? actComposite75;
+  final String? description;
+  final String? website;
+  final String? phoneNumber;
 
   University({
     required this.id,
@@ -47,6 +68,27 @@ class University {
     this.degrees,
     this.imageUrl,
     this.imageAltText,
+    required this.isHbcu,
+    required this.isTribal,
+    this.religiousAffiliation,
+    required this.carnegieClassification,
+    required this.controlOfInstitution,
+    this.applicantsTotal,
+    this.admissionsTotal,
+    this.enrolledTotal,
+    this.pctSubmitSat,
+    this.pctSubmitAct,
+    this.satReading25,
+    this.satReading75,
+    this.satMath25,
+    this.satMath75,
+    this.satWriting25,
+    this.satWriting75,
+    this.actComposite25,
+    this.actComposite75,
+    this.description,
+    this.website,
+    this.phoneNumber,
   });
 
   factory University.fromJson(Map<String, dynamic> json) {
@@ -61,6 +103,27 @@ class University {
       degrees: json['degrees'] != null ? DegreeOfferings.fromJson(json['degrees']) : null,
       imageUrl: json['image_url'],
       imageAltText: json['alt_text'],
+      isHbcu: json['is_hbcu'] ?? false,
+      isTribal: json['is_tribal'] ?? false,
+      religiousAffiliation: json['religious_affiliation'] == 'Not applicable' ? null : json['religious_affiliation'],
+      carnegieClassification: json['carnegie_classification'] ?? '',
+      controlOfInstitution: json['control_of_institution'] ?? '',
+      applicantsTotal: json['applicants_total']?.toDouble(),
+      admissionsTotal: json['admissions_total']?.toDouble(),
+      enrolledTotal: json['enrolled_total']?.toDouble(),
+      pctSubmitSat: json['pct_submit_sat']?.toDouble(),
+      pctSubmitAct: json['pct_submit_act']?.toDouble(),
+      satReading25: json['sat_reading_25']?.toDouble(),
+      satReading75: json['sat_reading_75']?.toDouble(),
+      satMath25: json['sat_math_25']?.toDouble(),
+      satMath75: json['sat_math_75']?.toDouble(),
+      satWriting25: json['sat_writing_25']?.toDouble(),
+      satWriting75: json['sat_writing_75']?.toDouble(),
+      actComposite25: json['act_composite_25']?.toDouble(),
+      actComposite75: json['act_composite_75']?.toDouble(),
+      description: json['description'],
+      website: json['website'],
+      phoneNumber: json['phone_number'],
     );
   }
 }
