@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'screens/home_screen.dart';
 import 'services/university_service.dart';
+import 'services/swipe_service.dart';
 
 void main() {
   runApp(const MyApp());
@@ -12,13 +13,20 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Provider(
-      create: (_) => UniversityService(),
+    return MultiProvider(
+      providers: [
+        Provider<UniversityService>(
+          create: (_) => UniversityService(baseUrl: 'http://localhost:8000'),
+        ),
+        Provider<SwipeService>(
+          create: (_) => SwipeService(baseUrl: 'http://localhost:8000'),
+        ),
+      ],
       child: MaterialApp(
-        title: 'University Search',
+        title: 'University Finder',
         theme: ThemeData(
           primarySwatch: Colors.blue,
-          useMaterial3: true,
+          visualDensity: VisualDensity.adaptivePlatformDensity,
         ),
         home: const HomeScreen(),
       ),
