@@ -116,7 +116,7 @@ class UniversityDetailScreen extends StatelessWidget {
                       'Test Scores',
                       [
                         if (university.pctSubmitSat != null)
-                          _buildInfoRow('Submit SAT', '${(university.pctSubmitSat! * 100).toStringAsFixed(1)}%'),
+                          _buildInfoRow('Submit SAT', '${(university.pctSubmitSat! * 1).toStringAsFixed(1)}%'),
                         if (university.satMath25 != null && university.satMath75 != null)
                           _buildInfoRow('SAT Math', '${university.satMath25!.toStringAsFixed(0)} - ${university.satMath75!.toStringAsFixed(0)}'),
                         if (university.satReading25 != null && university.satReading75 != null)
@@ -124,7 +124,7 @@ class UniversityDetailScreen extends StatelessWidget {
                         if (university.satWriting25 != null && university.satWriting75 != null)
                           _buildInfoRow('SAT Writing', '${university.satWriting25!.toStringAsFixed(0)} - ${university.satWriting75!.toStringAsFixed(0)}'),
                         if (university.pctSubmitAct != null)
-                          _buildInfoRow('Submit ACT', '${(university.pctSubmitAct! * 100).toStringAsFixed(1)}%'),
+                          _buildInfoRow('Submit ACT', '${(university.pctSubmitAct! * 1).toStringAsFixed(1)}%'),
                         if (university.actComposite25 != null && university.actComposite75 != null)
                           _buildInfoRow('ACT Composite', '${university.actComposite25!.toStringAsFixed(0)} - ${university.actComposite75!.toStringAsFixed(0)}'),
                       ],
@@ -219,4 +219,4 @@ class UniversityDetailScreen extends StatelessWidget {
       ),
     );
   }
-} 
+}
