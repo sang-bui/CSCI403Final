@@ -1,5 +1,5 @@
 from fastapi import FastAPI, HTTPException, Depends, Body
-from sqlalchemy import create_engine, Column, Integer, String, Boolean, Float, Text, ForeignKey, TIMESTAMP
+from sqlalchemy import create_engine, Column, Integer, String, Boolean, Float, Text, ForeignKey, TIMESTAMP, func
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session, relationship
 from typing import List, Optional
@@ -9,6 +9,9 @@ from dotenv import load_dotenv
 from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime
 from pydantic import BaseModel
+from fastapi.responses import HTMLResponse
+import plotly.express as px
+import pandas as pd
 
 # Load environment variables
 load_dotenv()
@@ -530,6 +533,37 @@ def delete_match(match_id: int, db: Session = Depends(get_db)):
     db.commit()
     return {"message": "Match deleted successfully"}
 
+@app.get("/sunburst-chart", response_class=HTMLResponse)
+def generate_sunburst_chart(db: Session = Depends(get_db)):
+    data = (
+        db.query(
+            University.state,
+            University.sector,
+            DegreeOffering.highest_degree,
+            func.count(University.id).label("count")
+        )
+        .join(DegreeOffering, University.id == DegreeOffering.university_id)
+        .group_by(University.state, University.sector, DegreeOffering.highest_degree)
+        .all()
+    )
+
+    # Convert data to a DataFrame
+    df = pd.DataFrame(data, columns=["State", "Sector", "Highest Degree", "Count"])
+
+    # Create a sunburst chart using Plotly
+    fig = px.sunburst(
+        df,
+        path=["State", "Sector", "Highest Degree"],
+        values="Count",
+        title="Sunburst Chart of Universities by State, Sector, and Highest Degree",
+    )
+
+    # Generate the HTML for the chart
+    chart_html = fig.to_html(full_html=False)
+
+    # Return the chart as an HTML response
+    return HTMLResponse(content=chart_html)
+
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000) 
+    uvicorn.run(app, host="0.0.0.0", port=8000)

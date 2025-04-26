@@ -3,3 +3,4 @@ venv/
 .idea/
 .vscode/
 .dart_tool
+sunburst_chart.html

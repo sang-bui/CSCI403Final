@@ -8,6 +8,7 @@ import 'dart:async';
 import 'university_detail_screen.dart';
 import '../services/swipe_service.dart';
 import 'matches_screen.dart';
+import 'sunburst_chart_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -485,6 +486,17 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               );
             },
           ),
+          IconButton(
+            icon: const Icon(Icons.pie_chart),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const SunburstChartScreen(),
+                ),
+              );
+            },
+          ),
         ],
       ),
       body: _isLoading
@@ -751,4 +763,4 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       ),
     );
   }
-} 
+}
